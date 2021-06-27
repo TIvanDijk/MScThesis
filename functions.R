@@ -23,11 +23,11 @@ doRidge <- function(param, lambda, order, newx, seed = 42){
   if (length(lambda > 1)){
     ridge_cv <- cv.glmnet(x.param, y.param, alpha = 0, lambda = lambda)
     lambda.opt = ridge_cv$lambda.min
-    cat('\n Optimal lambda (for given range) of: ', lambda.opt, '\n')
+    #cat('\n Optimal lambda (for given range) of: ', lambda.opt, '\n')
   } else {lambda.opt = lambda}
   
   param.ridge = glmnet(x.param, y.param, alpha = 0, lambda = lambda.opt)
-  print(coef(param.ridge))
+  #print(coef(param.ridge))
   
   param.hat = c()
   all.params = y.param
@@ -40,6 +40,10 @@ doRidge <- function(param, lambda, order, newx, seed = 42){
   return( list(param.hat = param.hat, param = y.param))
 }
 
+# calculate MSE 
+mse <- function(actual, pred){
+  mean( (actual - pred)^2 )
+}
 
 # functions for the SIR model and their extensions 
 classical.SIR <- function(time, state, parameters){
@@ -101,4 +105,23 @@ asymptomatic2.SIR <- function(time, state, parameters){
   }
   )
 }
+
+vaccinated.SIR <- function(time, state, parameters){
+  with(as.list( c(state, parameters)), {
+    alpha = eval(parse(text = paste0('alpha', round(time, 0))))
+    beta = eval(parse(text = paste0('beta', round(time, 0))))
+    gamma = eval(parse(text = paste0('gamma', round(time, 0))))
+    
+    N = S + I + R + V
+    dS=-(beta*S*I)/N + alpha*S
+    dI=(beta*S*I + sigma*beta*V*I)/N - gamma*I
+    dR=gamma*I
+    dV=alpha*S - sigma*beta*V*I/N
+    
+    return(list(c(dS, dI, dR, dV)))
+  } )
+}
+
+
+
 

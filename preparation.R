@@ -8,6 +8,7 @@ library(readr)
 library(ggplot2)
 library(tidyverse)
 library(patchwork)
+library(zoo)
 
 # dataset that contains reported cases
 ma <- function(x, n = 7){stats::filter(c(rep(0,n), x), rep(1 / n, n), sides = 1)[-c(1:n)]}
@@ -26,13 +27,25 @@ data.hosp <- read_delim('https://data.rivm.nl/covid-19/COVID-19_ziekenhuisopname
   summarise(hosp = sum(Hospital_admission)) %>% 
   dplyr::transmute(date = Date_of_statistics, hosp = hosp)
 
+# dataset (OWID) that contains fully vaccinated individuals 
+OWID <- read_delim('https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/country_data/Netherlands.csv', delim = ',') 
+
+data.vacc <- OWID[-nrow(OWID), ] %>% 
+  select(c('date', 'people_fully_vaccinated')) %>% 
+  right_join(tibble(date = seq(OWID$date[1], OWID$date[nrow(OWID)-1], by = 1))) %>% 
+  arrange(date) %>% 
+  transmute(date = date, vacc = na.approx(people_fully_vaccinated))
+
+
 # combine the datasets 
-data <- left_join(data.hosp, data.cases)
+data <- left_join(data.hosp, data.cases) %>% 
+  left_join(data.vacc)
 data <- data[-1, ] %>%  #remove first observations
   mutate(time = time - 1)
 
 data$beta.t = ma((dplyr::lead(data$I) - data$I + dplyr::lead(data$R) - data$R) / data$I) # eq. 11 of thesis
 data$gamma.t  = ma((dplyr::lead(data$R) - data$R) / data$I)   # eq. 9 of thesis
+data$alpha.t = (data$vacc - dplyr::lag(data$vacc)) / 17.4e6   # eq. 25 of thesis 
 
 # store data
 saveRDS(data, 'data.RDS')
@@ -73,8 +86,20 @@ p2 <- ggplot(data, aes(x = date, y = hosp)) +
 p1 + p2
 ggsave('plots/reportedCases.pdf', width = 16, height = 4.5)
 
+# plot on number of vaccinated individuals over time 
+ggplot(data, aes(x = date, y = vacc / 17.4e6 * 100)) +
+  geom_col(fill = '#2E8B57', color = '#2E8B57') +
+  scale_x_date(date_breaks = '60 days', date_labels="%B %d,%Y") +
+  labs(x = 'Date', y = '% of Fully Vaccinated Individuals') +
+  TivD::theme_newgrey(text = element_text('mono'))
+ggsave('plots/fullyVaccinated.pdf', width = 8, height = 4.5)
+
+
 # some 'summary' statistics used in the paper
 cat('The dataset ranges from', format(min(data$date), '%B %d, %Y'), 'to', 
     format(max(data$date), '%B %d, %Y'))
+
+cat('The vaccination dataset ranges from', format(min(data.vacc$date), '%B %d, %Y'), 'to', 
+    format(max(data.vacc$date), '%B %d, %Y'))
 
 
