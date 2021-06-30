@@ -1,7 +1,8 @@
 ###############################################################################
 #                             MAIN ANALYSIS                                   #
 # This script contains the following:                                         #
-#     -                                                                       #
+#     - implementation of SIR, SIR-T, SIAR-T (I & II), SIRV-T                 #
+#     - code to generate figures 6 to 10 of the thesis                        #
 # This script depends on:                                                     #
 #     - functions.R                                                           #
 ############################################################################### 
@@ -19,7 +20,7 @@ gamma.seq = seq(0,0.01,0.00002)
 
 beta.a = 0.12         # guesstimate
 w.s = 0.30             # guesstimate - method 1
-w.s2 = 0.7            # guesstimate - method 2
+w.s2 = 0.30            # guesstimate - method 2
 sigma.val = 0.2       # vaccine efficiency
 
 # required libraries 
@@ -63,7 +64,7 @@ betaPlot <- ggplot(data[test,], aes(x = test)) +
   geom_line( aes(y = beta.ridge$param.hat, color = 'Predicted (J = 3)'), size = 1, alpha = 0.8) +
   geom_line( aes(y = doRidge(data$beta.t[train], beta.seq, 10, length(test))$param.hat,
                  color = 'Predicted (J = 10)'), size = 1, alpha = 0.8) +
-  TivD::theme_newgrey(text = element_text('mono'), legend.position = c(0.85, 0.15)) +
+  TivD::theme_newgrey(text = element_text('mono'), legend.position = c(0.35, 0.15)) +
   labs(x = 'Time', y = expression('Transmission Rate'~~beta(t)), color = 'Legend',
        title = expression(bold('A: Accuracy of Transmission Rate'~~beta(t))))
 
@@ -72,7 +73,7 @@ gammaPlot <- ggplot(data[test, ], aes(x = test)) +
   geom_line( aes(y = gamma.ridge$param.hat, color = 'Predicted (K = 3)'), size = 1, alpha = 0.8) +
   geom_line( aes(y = doRidge(data$gamma.t[train], gamma.seq, 10, length(test))$param.hat,
                  color = 'Predicted (K = 10)'), size = 1, alpha = 0.8) +
-  TivD::theme_newgrey(text = element_text('mono'), legend.position = c(0.85, 0.15)) +
+  TivD::theme_newgrey(text = element_text('mono'), legend.position = c(0.7, 0.15)) +
   labs(x = 'Time', y = expression('Recovery Rate'~~gamma(t)), color = 'Legend',
        title = expression(bold('B: Accuracy of Recovery Rate'~~gamma(t))))
 
@@ -82,7 +83,7 @@ ggsave('plots/modelParams.pdf', width = 15, height = 6)
 ggplot(data[test,], aes(x = test)) +
   geom_line( aes(y = beta.t, color = 'Actual'), size = 1) +
   geom_line( aes(y = beta.s, color = 'Predicted'), size = 1, alpha = 0.8) +
-  TivD::theme_newgrey(text = element_text('mono'), legend.position = c(0.85, 0.15)) +
+  TivD::theme_newgrey(text = element_text('mono'), legend.position = c(0.25, 0.15)) +
   labs(x = 'Time', y = expression('Transmission Rate'~~beta[s](t)), color = 'Legend')
 ggsave('plots/beta_sFIT.pdf', height = 5, width = 8)
 
@@ -109,8 +110,8 @@ ggplot(output, aes(x = time, y = value, color = State, group = State)) +
 
 # predicted I vs measured cases 
 fit.class <- ggplot(subset(output, State == 'I'), aes(x = test, y = value)) +
-  geom_line(aes(color = 'predicted'), size = 1) +
-  geom_line(data = data[test,], aes(y = I, color = 'real'), size = 1) +
+  geom_line(aes(color = 'Predicted'), size = 1) +
+  geom_line(data = data[test,], aes(y = I, color = 'Actual'), size = 1) +
   TivD::theme_newgrey(text = element_text('mono')) +
   labs(title = 'A: Classical SIR', x = 'Time', y = 'Infectious Individuals I(t)',
        color = '')
@@ -133,8 +134,8 @@ ggplot(output, aes(x = time, y = value, color = State, group = State)) +
 
 # predicted I vs measured cases 
 fit.time <- ggplot(subset(output, State == 'I'), aes(x = test[-1], y = value)) +
-  geom_line(aes(color = 'predicted'), size = 1) +
-  geom_line(data = data[test[-length(test)],], aes(y = I, color = 'real'), size = 1) +
+  geom_line(aes(color = 'Predicted'), size = 1) +
+  geom_line(data = data[test[-length(test)],], aes(y = I, color = 'Actual'), size = 1) +
   TivD::theme_newgrey(text = element_text('mono')) +
   labs(title = paste0('B: Time-Dependent SIR (J = ', J, ', K = ', K, ')'), x = 'Time', y = 'Infectious Individuals I(t)',
        color = '')
@@ -162,8 +163,8 @@ ggplot(output, aes(x = time, y = value, color = State, group = State)) +
 title = bquote(bold('C: Asympotomatic SIR I ' ~ (K == .(K)~','~ omega[a] == .(1-w.s) ~','~ beta[a] == .(beta.a))))
 # predicted I vs measured cases 
 fit.asymptotic <- ggplot(subset(output, State == 'I'), aes(x = test[-1], y = value)) +
-  geom_line(aes(color = 'predicted'), size = 1) +
-  geom_line(data = data[test[-length(test)],], aes(y = I, color = 'real'), size = 1) +
+  geom_line(aes(color = 'Predicted'), size = 1) +
+  geom_line(data = data[test[-length(test)],], aes(y = I, color = 'Actual'), size = 1) +
   TivD::theme_newgrey(text = element_text('mono')) +
   labs(title = title, x = 'Time', y = 'Infectious Individuals I(t)',
        color = '')
@@ -174,10 +175,10 @@ predict = unlist(subset(output, State == 'I')[, 'value'])
 cat('\nMSE of SIAR-T  (I, in millions): ', mse(actual[mse.int], predict[mse.int])/1e6)
 
 # D: asymptomatic SIR - method 2
-parameters = c('beta.s' = 1.2*beta.ridge$param.hat, 'gamma' = gamma.ridge$param.hat, 
-               'beta.a' = 1.2*beta.ridge$param.hat/2, w.s = w.s2, w.a = 1-w.s2)
-initial_vals = c(S = 17.4e6-data$I[n]-data$R[n], Is = data$I[n]*w.s, 
-                 A = data$I[n]*(1-w.s), R = data$R[n])    
+parameters = c('beta.s' = 1.5*beta.ridge$param.hat, 'gamma' = gamma.ridge$param.hat, 
+               'beta.a' = 0.75*beta.ridge$param.hat, w.s = w.s2, w.a = 1-w.s2)
+initial_vals = c(S = 17.4e6-data$I[n]-data$R[n], Is = data$I[n]*w.s2, 
+                 A = data$I[n]*(1-w.s2), R = data$R[n])    
 
 output <- as.data.frame(ode(y=initial_vals, func = asymptomatic2.SIR, parms=parameters, times = 1:length(test[-1]))) %>% 
   mutate(I = Is + A) %>% 
@@ -192,8 +193,8 @@ ggplot(output, aes(x = time, y = value, color = State, group = State)) +
 title = bquote(bold('D: Asympotomatic SIR II ' ~ (J == .(J)~','~K == .(K)~','~ omega[a] == .(1-w.s2))))
 # predicted I vs measured cases 
 fit.asymptotic2 <- ggplot(subset(output, State == 'I'), aes(x = test[-1], y = value)) +
-  geom_line(aes(color = 'predicted'), size = 1) +
-  geom_line(data = data[test[-length(test)],], aes(y = I, color = 'real'), size = 1) +
+  geom_line(aes(color = 'Predicted'), size = 1) +
+  geom_line(data = data[test[-length(test)],], aes(y = I, color = 'Actual'), size = 1) +
   TivD::theme_newgrey(text = element_text('mono')) +
   labs(title = title, x = 'Time', y = 'Infectious Individuals I(t)',
        color = '')
@@ -217,11 +218,12 @@ ggplot(output, aes(x = time, y = value, color = State, group = State)) +
   geom_line()
 
 # predicted I vs measured cases 
+title = bquote(bold('E: Time-Dependent SIRV ' ~ (J == .(J)~','~K == .(K)~','~ sigma == .(sigma.val))))
 fit.vacc <- ggplot(subset(output, State == 'I'), aes(x = testV[-1], y = value)) +
-  geom_line(aes(color = 'predicted'), size = 1) +
-  geom_line(data = data[testV[-1],], aes(y = I, color = 'real'), size = 1) +
+  geom_line(aes(color = 'Predicted'), size = 1) +
+  geom_line(data = data[testV[-1],], aes(y = I, color = 'Actual'), size = 1) +
   TivD::theme_newgrey(text = element_text('mono'), legend.position = c(0.85, 0.85)) +
-  labs(title = paste0('E: Time-Dependent SIRV (J = ', J, ', K = ', K, ')'), x = 'Time', y = 'Infectious Individuals I(t)',
+  labs(title = title, x = 'Time', y = 'Infectious Individuals I(t)',
        color = 'Legend')
 fit.vacc
 ggsave('plots/modelSIRV.pdf', width = 8, height = 5)

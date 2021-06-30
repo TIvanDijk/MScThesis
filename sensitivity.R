@@ -1,7 +1,7 @@
 ###############################################################################
 #                             SENSITIVITY ANALYSIS                            #
 # This script contains the following:                                         #
-#     -                                                                       #
+#     -  scripts needed for Table 3, 4 & 5                                    #
 # This script depends on:                                                     #
 #     - functions.R                                                           #
 ############################################################################### 
@@ -28,7 +28,7 @@ cat(crayon::bold('Classical SIR\n'))
 initial_vals = c(S = 17.4e6-data$I[n]-data$R[n], I = data$I[n], R = data$R[n])
 
 cat(crayon::italic('changing beta\n'))
-beta.range = c(0.132,0.121,0.11,0.099, 0.088)     # roughly +20%, +10%, actual, -10%, -20%
+beta.range = c(0.132,0.121,0.1109516,0.099, 0.088)     # roughly +20%, +10%, actual, -10%, -20%
 for (beta in beta.range){
   parameters = c(gamma = 0.09405225, beta = beta)
   output <- as.data.frame(ode(y=initial_vals, func = classical.SIR, parms=parameters, times = test)) %>% 
@@ -39,7 +39,7 @@ for (beta in beta.range){
 }
 
 cat(crayon::italic('\nchanging gamma\n'))
-gamma.range = c(0.113,0.103,0.094,0.085, 0.075)     # roughly +20%, +10%, actual, -10%, -20%
+gamma.range = c(0.113,0.103,0.09405225,0.085, 0.075)     # roughly +20%, +10%, actual, -10%, -20%
 for (gamma in gamma.range){
   parameters = c(gamma = gamma, beta = 0.1109516)
   output <- as.data.frame(ode(y=initial_vals, func = classical.SIR, parms=parameters, times = test)) %>% 
@@ -171,10 +171,10 @@ cat('\tperiod T3 gives MSE of', mse(actual[T3], predict[T3])/1e6, 'million\n')
 cat(crayon::bold('\n SIAR-T (II)\n'))
 
 cat(crayon::italic('\nchanging w_s\n'))
-range.ws = c(0.84, 0.77,  0.70, 0.63, 0.56)
+range.ws = c(0.36, 0.33,  0.30, 0.27, 0.24)
 for (w.s in range.ws){
-  parameters = c('beta.s' = 1.2*beta.ridge$param.hat, 'gamma' = gamma.ridge$param.hat, 
-                 'beta.a' = 1.2*beta.ridge$param.hat/2, w.s = w.s, w.a = 1-w.s)
+  parameters = c('beta.s' = 1.5*beta.ridge$param.hat, 'gamma' = gamma.ridge$param.hat, 
+                 'beta.a' = 0.75*beta.ridge$param.hat, w.s = w.s, w.a = 1-w.s)
   initial_vals = c(S = 17.4e6-data$I[n]-data$R[n], Is = data$I[n]*w.s, 
                    A = data$I[n]*(1-w.s), R = data$R[n])    
   
@@ -202,5 +202,67 @@ predict = unlist(subset(output, State == 'I')[, 'value'])
 cat('\tperiod T1 gives MSE of', mse(actual[T1], predict[T1])/1e6, 'million\n')
 cat('\tperiod T2 gives MSE of', mse(actual[T2], predict[T2])/1e6, 'million\n')
 cat('\tperiod T3 gives MSE of', mse(actual[T3], predict[T3])/1e6, 'million\n')
+
+## 5: SIRV-T model
+cat(crayon::bold('\n SIRV-T\n'))
+nV = min(testV)  # starting point for vaccinated 
+initial_vals = c(S = 17.4e6-data$I[nV]-data$R[nV]-data$vacc[nV], I = data$I[nV], R = data$R[nV],
+                 V = data$vacc[nV])
+trainV =  333:450     # days used for training of vaccinated data
+testV = 450:479       # days used for testing of vaccinated data
+
+betaV = doRidge(data$beta.t[trainV], seq(0,0.01,0.00002), 3, length(testV))
+gammaV = doRidge(data$gamma.t[trainV], seq(0,0.01,0.00002), 3, length(testV))
+
+coefs = coef(lm( log(alpha.t) ~ I(-1*time), data = data[trainV,]))
+alpha.0 = exp(coefs[1]); omega = coefs[2]
+alpha = alpha.0 * exp(-omega * testV)
+
+cat(crayon::italic('\nchanging inefficiency sigma \n'))
+sigma.vals = c(0.24, 0.22, 0.2, 0.18, 0.16)
+for(sigma.val in sigma.vals){
+  parameters = c('beta' = betaV$param.hat, 'gamma' = gammaV$param.hat, 
+                 'alpha' = alpha, sigma = sigma.val)
+  output <- as.data.frame(ode(y=initial_vals, func = vaccinated.SIR, parms=parameters, times = 1:length(testV[-1]))) %>% 
+    pivot_longer(2:5, names_to = 'State')
+  actual = unlist(data[testV[-length(testV)], 'I'])
+  predict = unlist(subset(output, State == 'I')[, 'value'])
+  cat('\tsigma =', sigma.val, 'gives MSE of', mse(actual, predict)/1e6, 'million\n')
+}
+
+cat(crayon::italic('\nchanging J \n'))
+J.vals = 5:2
+gammaV = doRidge(data$gamma.t[trainV], seq(0,0.01,0.00002), 3, length(testV))
+for(J in J.vals){
+  betaV = doRidge(data$beta.t[trainV], seq(0,0.01,0.00002), J, length(testV))
+  parameters = c('beta' = betaV$param.hat, 'gamma' = gammaV$param.hat, 
+                 'alpha' = alpha, sigma = 0.20)
+  output <- as.data.frame(ode(y=initial_vals, func = vaccinated.SIR, parms=parameters, times = 1:length(testV[-1]))) %>% 
+    pivot_longer(2:5, names_to = 'State')
+  actual = unlist(data[testV[-length(testV)], 'I'])
+  predict = unlist(subset(output, State == 'I')[, 'value'])
+  cat('\tJ =', J, 'gives MSE of', mse(actual, predict)/1e6, 'million\n')
+}
+
+cat(crayon::italic('\nchanging K \n'))
+K.vals = 5:2
+betaV = doRidge(data$beta.t[trainV], seq(0,0.01,0.00002), 3, length(testV))
+
+for(K in K.vals){
+  gammaV = doRidge(data$gamma.t[trainV], seq(0,0.01,0.00002), K, length(testV))
+  parameters = c('beta' = betaV$param.hat, 'gamma' = gammaV$param.hat, 
+                 'alpha' = alpha, sigma = 0.20)
+  output <- as.data.frame(ode(y=initial_vals, func = vaccinated.SIR, parms=parameters, times = 1:length(testV[-1]))) %>% 
+    pivot_longer(2:5, names_to = 'State')
+  actual = unlist(data[testV[-length(testV)], 'I'])
+  predict = unlist(subset(output, State == 'I')[, 'value'])
+  cat('\tK =', K, 'gives MSE of', mse(actual, predict)/1e6, 'million\n')
+}
+
+
+
+
+
+
 
 

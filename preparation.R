@@ -2,7 +2,7 @@
 #                             DATA PREPARATION                                #
 # This script contains the following:                                         #
 #     - creation of 'data.RDS' based on data from the RIVM                    #
-#     - visualisations of the dataset                                         #
+#     - visualisations of the dataset (figures 4 & 5)                         #
 ############################################################################### 
 library(readr)
 library(ggplot2)
@@ -64,7 +64,7 @@ p1 <- ggplot(data, aes(x = date, y = cases.reported)) +
            fontface = 'bold', color = 'red', family = 'mono') +
   geom_col(fill = 'mistyrose3', color = 'mistyrose3') +
   scale_x_date(date_breaks = '5 months', date_labels="%B %d,%Y") +
-  labs(x = 'Date', y = 'Reported Cases',
+  labs(x = 'Date', y = 'Daily Reported Cases',
        title = 'A: Cases') +
   TivD::theme_newgrey(text = element_text('mono'))
 
@@ -79,12 +79,12 @@ p2 <- ggplot(data, aes(x = date, y = hosp)) +
            fontface = 'bold', color = 'red', family = 'mono') +
   geom_col(fill = 'khaki3', color = 'khaki3') +
   scale_x_date(date_breaks = '5 months', date_labels="%B %d,%Y") +
-  labs(x = 'Date', y = 'Reported Hospitalisations', 
+  labs(x = 'Date', y = 'Daily Reported Hospitalisations', 
        title = 'B: Hospitalisations' ) +
   TivD::theme_newgrey(text = element_text('mono'))
 
 p1 + p2
-ggsave('plots/reportedCases.pdf', width = 16, height = 4.5)
+ggsave('plots/reportedCases.pdf', width = 16, height = 5)
 
 # plot on number of vaccinated individuals over time 
 ggplot(data, aes(x = date, y = vacc / 17.4e6 * 100)) +

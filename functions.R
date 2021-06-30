@@ -1,6 +1,6 @@
 ###############################################################################
 #                             FUNCTIONS                                       #
-# Contains all functions used in main.R                                       #
+# Contains all functions used in main.R & sensitivity.R                       #
 ############################################################################### 
 
 # functions to work with the dataset
